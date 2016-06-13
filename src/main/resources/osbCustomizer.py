@@ -7,6 +7,14 @@
 #	Copyright (c):					Tomas (Tome) Frastia | TomeCode.com
 #
 #	Changelog:
+#	1.1.23	Fail if a server is specified but unable to connect
+#	1.1.22	WSDLs excluded from checking for forbidden tokens
+#	1.1.21	Schemas excluded from checking for forbidden tokens
+#	1.1.20	Added support to configure Execution & Message tracing in Proxy services and Message tracing in Business services
+#	1.1.19	Exclude embedded jars from tokenisation
+#	1.1.18	Token replacement and detection now happens on all files in jar
+#	1.1.17	Support for specifying policies
+#	1.1.16	Support for changing WS Policy fields
 #	1.1.15	Sets wlst exitcode on failure so calling script can detect failed deployment
 #	1.1.14	Added ability to configure http business service throttling when no throttling entry exists in business service source
 #	1.1.13	Added ability to configure http business service throttling
@@ -54,6 +62,7 @@ from xml.dom import minidom
 from javax.xml.namespace import QName
 
 from java.io import ByteArrayInputStream
+from java.io import ByteArrayInputStream
 from java.io import ByteArrayOutputStream
 from java.io import FileOutputStream
 from java.util.jar import JarInputStream
@@ -66,6 +75,7 @@ from com.bea.wli.sb.services import ServiceAccountDocument
 from com.bea.wli.sb.services import ServiceDefinition
 from com.bea.wli.sb.services import StaticServiceAccount
 from com.bea.wli.sb.services import ServiceProviderEntry
+from com.bea.wli.sb.services import PolicyBindingModeType
 
 from com.bea.wli.sb.transports import EndPointConfiguration
 from com.bea.wli.sb.transports import URIType
@@ -135,6 +145,8 @@ from com.bea.wli.domain.config import OperationalSettings
 from com.bea.wli.config.customization import Customization
 
 from com.bea.wli.monitoring.alert import AlertDestination
+
+from com.bea.wli.sb.services import MessageTracingLevelEnum
 
 #===================================================================
 LOG_CUST_FILE = ' --> '
@@ -266,7 +278,6 @@ def writeToFile(fName, data):
 	fos.flush()
 	fos.close()
 
-
 def saveNewSbConfigNoFS(sbFileName,data, replaceFile):
 	index=sbFileName.rfind('.')
 	if (replaceFile):
@@ -307,6 +318,7 @@ def connectToOSB():
 		return True
 	except WLSTException:
 		print ' --- No server is running at '+ uri+ ' !\n Deploy cancelled!'
+		exit(exitcode=5)
 	return False
 
 
@@ -335,6 +347,7 @@ def uploadSbConfigToOSB(ALSBConfigurationMBean, sbConfigJar):
 	ALSBConfigurationMBean.uploadJarFile(readBinaryFile(sbConfigJar))
 	print '		..Uploaded: ' + sbConfigJar
 	importResult= createImportProject(ALSBConfigurationMBean)
+	print '		..Imported: ' + sbConfigJar
 
 def showVersionSummary():
 	print 'Server: ' + version
@@ -422,6 +435,19 @@ def getThrottling(serviceDefinition):
 	if throttling==None:
 		return serviceDefinition.getCoreEntry().addNewThrottling()
 	return throttling
+
+def getWsPolicyPolicies(serviceDefinition):
+	policies = serviceDefinition.getCoreEntry().getWsPolicy().getPolicies()
+	if policies==None:
+		return serviceDefinition.getCoreEntry().getWsPolicy().addNewPolicies()
+	return policies
+
+def getWsPolicyPoliciesServicePolicy(serviceDefinition):
+	policies = getWsPolicyPolicies(serviceDefinition)
+	policy = policies.getServicePolicy()
+	if policy==None:
+		return policies.addNewServicePolicy()
+	return policy
 
 def getHttpInboundProperties(serviceDefinition):
 	httpEndPointConfiguration = getHttpEndPointConfiguration(serviceDefinition)
@@ -805,6 +831,59 @@ def local_proxyservice_slaalerting(entry, val):
 def local_proxyservice_pipelinealerting(entry, val):
 	return True # parent group
 
+def local_proxyservice_wspolicy(entry, val):
+	return True  # parent group
+
+def local_proxyservice_executiontracing(entry, val):
+	return True  # parent group
+
+def local_proxyservice_messagetracing(entry, val):
+	return True  # parent group
+
+def local_proxyservice_executiontracing_isenabled(entry,val):
+	entry.getCoreEntry().setIsTracingEnabled(val)
+
+def local_proxyservice_messagetracing_isenabled(entry,val):
+	if(entry.getCoreEntry().getMessageTracing()==None):
+		entry.getCoreEntry().addNewMessageTracing().setEnabled(val)
+	else:
+		entry.getCoreEntry().getMessageTracing().setEnabled(val)
+
+def local_proxyservice_messagetracing_defaultencoding(entry,val):
+	if(entry.getCoreEntry().getMessageTracing()==None):
+		entry.getCoreEntry().addNewMessageTracing().setDefaultEncoding(val)
+	else:
+		entry.getCoreEntry().getMessageTracing().setDefaultEncoding(val)
+
+def local_proxyservice_messagetracing_maxsize(entry,val):
+	if(entry.getCoreEntry().getMessageTracing()==None):
+		entry.getCoreEntry().addNewMessageTracing().setMaxSize(val)
+	else:
+		entry.getCoreEntry().getMessageTracing().setMaxSize(val)
+
+def local_proxyservice_messagetracing_detaillevel(entry,val):
+	if val.upper() == 'FULL':
+		en_val = MessageTracingLevelEnum.FULL
+	elif val.upper() == 'HEADERS':
+		en_val = MessageTracingLevelEnum.HEADERS
+	elif val.upper() == 'TERSE': 
+		en_val = MessageTracingLevelEnum.TERSE
+	if(entry.getCoreEntry().getMessageTracing()==None):
+		entry.getCoreEntry().addNewMessageTracing().setDetailsLevel(en_val)
+	else:
+		entry.getCoreEntry().getMessageTracing().setDetailsLevel(en_val)
+
+
+def local_proxyservice_wspolicy_bindingmode(entry, val):
+	entry.getCoreEntry().getWsPolicy().setBindingMode(PolicyBindingModeType.Enum.forString(val))
+
+def local_proxyservice_wspolicy_policies(entry, values):
+	servicePolicy = getWsPolicyPoliciesServicePolicy(entry)
+	#clean out existing policies
+	servicePolicy.setOwsmPolicyRefArray([])
+	for ref in values:
+		servicePolicy.addNewOwsmPolicyRef().setID(ref)
+
 def local_proxyservice_monitoring_isenabled(entry, val):
 	entry.getCoreEntry().getMonitoring().setIsEnabled(val)
 
@@ -856,6 +935,36 @@ def http_proxyservice_slaalerting(entry, val):
 
 def http_proxyservice_pipelinealerting(entry, val):
 	return True
+
+def http_proxyservice_wspolicy(entry, val):
+	return True
+
+def http_proxyservice_executiontracing(entry, val):
+	return True  # parent group
+
+def http_proxyservice_messagetracing(entry, val):
+	return True  # parent group
+
+def http_proxyservice_executiontracing_isenabled(entry,val):
+	local_proxyservice_executiontracing_isenabled(entry,val)
+
+def http_proxyservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def http_proxyservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def http_proxyservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def http_proxyservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def http_proxyservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def http_proxyservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
 
 def http_proxyservice_monitoring_isenabled(entry, val):
 	local_proxyservice_monitoring_isenabled(entry, val)
@@ -1111,6 +1220,36 @@ def jms_proxyservice_slaalerting(entry, val):
 def jms_proxyservice_pipelinealerting(entry, val):
 	return True
 
+def jms_proxyservice_wspolicy(entry, val):
+	return True
+
+def jms_proxyservice_executiontracing(entry, val):
+	return True  # parent group
+
+def jms_proxyservice_messagetracing(entry, val):
+	return True  # parent group
+
+def jms_proxyservice_executiontracing_isenabled(entry,val):
+	local_proxyservice_executiontracing_isenabled(entry,val)
+
+def jms_proxyservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def jms_proxyservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def jms_proxyservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def jms_proxyservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def jms_proxyservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def jms_proxyservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
+
 def jms_proxyservice_monitoring_isenabled(entry, val):
 	local_proxyservice_monitoring_isenabled(entry, val)
 
@@ -1163,10 +1302,34 @@ def http_businessservice_slaalerting(entry, val):
 
 def http_businessservice_pipelinealerting(entry, val):
 	return True
-	
+
+def  http_businessservice_wspolicy(entry, val):
+	return True
+
+def http_businessservice_messagetracing(entry, val):
+	return True  # parent group
+
+def http_businessservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def http_businessservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def http_businessservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def http_businessservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def  http_businessservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def http_businessservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
+
 def  http_businessservice_throttling(entry, val):
 	return True
-	
+
 def http_businessservice_throttling_enabled(entry, val):
 	getThrottling(entry).setEnabled(val)
 
@@ -1749,6 +1912,36 @@ def sb_proxyservice_slaalerting(entry, val):
 def sb_proxyservice_pipelinealerting(entry, val):
 	return True
 
+def sb_proxyservice_wspolicy(entry, val):
+	return True
+
+def sb_proxyservice_executiontracing(entry, val):
+	return True  # parent group
+
+def sb_proxyservice_messagetracing(entry, val):
+	return True  # parent group
+
+def sb_proxyservice_executiontracing_isenabled(entry,val):
+	local_proxyservice_executiontracing_isenabled(entry,val)
+
+def sb_proxyservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def sb_proxyservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def sb_proxyservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def sb_proxyservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def sb_proxyservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def sb_proxyservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
+
 def sb_proxyservice_monitoring_isenabled(entry, val):
 	local_proxyservice_monitoring_isenabled(entry, val)
 
@@ -1803,6 +1996,30 @@ def sb_businessservice_slaalerting(entry, val):
 
 def sb_businessservice_pipelinealerting(entry, val):
 	return True
+
+def sb_businessservice_wspolicy(entry, val):
+	return True
+
+def sb_businessservice_messagetracing(entry, val):
+	return True  # parent group
+
+def sb_businessservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def sb_businessservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def sb_businessservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def sb_businessservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def sb_businessservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def sb_businessservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
 
 def sb_businessservice_monitoring_isenabled(entry, val):
 	local_proxyservice_monitoring_isenabled(entry, val)
@@ -1968,50 +2185,48 @@ def customizeSbConfigFile(customizationFile,path):
 	#generate new SB Config
 	return osbJarEntries
 
+def jarEntryToString(jarEntry):
+	baos = ByteArrayOutputStream();
+	if jarEntry.getData() != None:
+		baos.write(jarEntry.getData(), 0, len(jarEntry.getData()))
+	return baos.toString()
+
 def tokenReplaceSbConfigFile(tokens, osbJarEntries):
 	print 'Tokens found and replaced on the following files:'
-	for jarEntry in osbJarEntries:
-		sbentry = loadEntryFactory(jarEntry)
+	for jarEntry in [jarEntry for jarEntry in osbJarEntries if jarEntry.getExtension() != 'archive']:
 		hasPrintedHeader = False
-		if sbentry != None:
-			# do token replacement
-			
-			sbentryAsString = sbentry.toString()
-			for token in SB_CUSTOMIZATOR_TOKENS:
-				if (token in sbentryAsString):
-					if (not hasPrintedHeader):
-						print LOG_CUST_FILE + jarEntry.getName()
-						hasPrintedHeader = True
-					if ('PASSWORD' in token.upper()):
-						#mask passwords
-						print LOG_CUST_FUNCTION + token + '->' + '*' * len(SB_CUSTOMIZATOR_TOKENS[token]) + ' (masked)'
-					else:
-						print LOG_CUST_FUNCTION + token + '->' + SB_CUSTOMIZATOR_TOKENS[token]
-					sbentryAsString = sbentryAsString.replace(token, SB_CUSTOMIZATOR_TOKENS[token])
-			
-			jarEntry.setData(sbentryAsString.encode('utf-8'))
+		sbentryAsString = jarEntryToString(jarEntry)
+		for token in SB_CUSTOMIZATOR_TOKENS:
+			if (token in sbentryAsString):
+				if (not hasPrintedHeader):
+					print LOG_CUST_FILE + jarEntry.getName()
+					hasPrintedHeader = True
+				if ('PASSWORD' in token.upper()):
+					#mask passwords
+					print LOG_CUST_FUNCTION + token + '->' + '*' * len(SB_CUSTOMIZATOR_TOKENS[token]) + ' (masked)'
+				else:
+					print LOG_CUST_FUNCTION + token + '->' + SB_CUSTOMIZATOR_TOKENS[token]
+				sbentryAsString = sbentryAsString.replace(token, SB_CUSTOMIZATOR_TOKENS[token])
+	
+		jarEntry.setData(sbentryAsString.encode('utf-8'))
 	return osbJarEntries
 
 def checkForForbiddenTokens(forbiddenTokens, osbJarEntries):
 	print 'Checking for forbidden tokens in the following files:'
-	for jarEntry in osbJarEntries:
-		sbentry = loadEntryFactory(jarEntry)
+	for jarEntry in [jarEntry for jarEntry in osbJarEntries if jarEntry.getExtension() not in ['archive','xmlschema','wsdl']]:
 		hasPrintedHeader = False
-		if sbentry != None:
-			# do token replacement
+		sbentryAsString = jarEntryToString(jarEntry)
+		foundTokens = [x for x in forbiddenTokens if x in sbentryAsString]
+		for forbiddenToken in foundTokens:
+			if (not hasPrintedHeader):
+				print LOG_CUST_FILE + jarEntry.getName()
+				hasPrintedHeader = True
 			
-			sbentryAsString = sbentry.toString()
-			foundTokens = [x for x in forbiddenTokens if x in sbentryAsString]
-			for forbiddenToken in foundTokens:
-				if (not hasPrintedHeader):
-					print LOG_CUST_FILE + jarEntry.getName()
-					hasPrintedHeader = True
-				
-				print LOG_CUST_FUNCTION + '"' + forbiddenToken + '" detected'
-				
-			if (foundTokens):
-				print ''
-				raise ValueError('Found ' + str(len(foundTokens)) + ' forbidden tokens')
+			print LOG_CUST_FUNCTION + '"' + forbiddenToken + '" detected'
+			
+		if (foundTokens):
+			print ''
+			raise ValueError('Found ' + str(len(foundTokens)) + ' forbidden tokens')
 	return
 
 def executeCustomization():
