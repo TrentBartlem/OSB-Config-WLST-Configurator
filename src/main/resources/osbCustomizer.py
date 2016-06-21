@@ -7,6 +7,7 @@
 #	Copyright (c):					Tomas (Tome) Frastia | TomeCode.com
 #
 #	Changelog:
+#	1.1.24	Added support for http compression flags
 #	1.1.23	Fail if a server is specified but unable to connect
 #	1.1.22	WSDLs excluded from checking for forbidden tokens
 #	1.1.21	Schemas excluded from checking for forbidden tokens
@@ -945,6 +946,19 @@ def http_proxyservice_executiontracing(entry, val):
 def http_proxyservice_messagetracing(entry, val):
 	return True  # parent group
 
+def http_proxyservice_compression(entry, val):
+	return True  # parent group
+
+def http_proxyservice_compression_issupported(entry, val):
+	if(getHttpEndPointConfiguration(entry).isSetCompression()):
+		getHttpEndPointConfiguration(entry).getCompression().setCompressionSupport(val)
+	else:
+		getHttpEndPointConfiguration(entry).addNewCompression().setCompressionSupport(val)
+
+def http_proxyservice_compression_isbufferingsupported(entry, val):
+	if(getHttpEndPointConfiguration(entry).getCompression().getCompressionSupport() == True) :
+		getHttpEndPointConfiguration(entry).getCompression().setCompressionBuffering(val)
+
 def http_proxyservice_executiontracing_isenabled(entry,val):
 	local_proxyservice_executiontracing_isenabled(entry,val)
 
@@ -1308,6 +1322,23 @@ def  http_businessservice_wspolicy(entry, val):
 
 def http_businessservice_messagetracing(entry, val):
 	return True  # parent group
+
+def http_businessservice_compression(entry, val):
+	return True  # parent group
+
+def http_businessservice_compression_issupported(entry, val):
+	if(getHttpEndPointConfiguration(entry).isSetCompression()):
+		getHttpEndPointConfiguration(entry).getCompression().setCompressionSupport(val)
+	else:
+		getHttpEndPointConfiguration(entry).addNewCompression().setCompressionSupport(val)
+
+def http_businessservice_compression_isbufferingsupported(entry, val):
+	if(getHttpEndPointConfiguration(entry).getCompression().getCompressionSupport() == True) :
+		getHttpEndPointConfiguration(entry).getCompression().setCompressionBuffering(val)
+
+def http_businessservice_compression_algorithm(entry, val):
+	if(getHttpEndPointConfiguration(entry).getCompression().getCompressionSupport() == True) :
+		getHttpEndPointConfiguration(entry).getCompression().setCompressionAlgorithm(val)
 
 def http_businessservice_messagetracing_isenabled(entry,val):
 	local_proxyservice_messagetracing_isenabled(entry,val)
