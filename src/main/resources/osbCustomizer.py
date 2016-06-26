@@ -7,6 +7,7 @@
 #	Copyright (c):					Tomas (Tome) Frastia | TomeCode.com
 #
 #	Changelog:
+#	1.1.25	Fixed basic_auth->no_auth customization
 #	1.1.24	Added support for http compression flags
 #	1.1.23	Fail if a server is specified but unable to connect
 #	1.1.22	WSDLs excluded from checking for forbidden tokens
@@ -1062,7 +1063,9 @@ def http_proxyservice_authentication_sslclientauthentication(entry, val):
 	getHttpInboundProperties(entry).setClientAuthentication(SSLClientAuthenticationType.Factory.newInstance())
 
 def http_proxyservice_authentication_none(entry, val):
-	getHttpInboundProperties(entry).setClientAuthentication(None)
+	auth = getHttpInboundProperties(entry).getClientAuthentication()
+	if auth != None:
+		getHttpInboundProperties(entry).unsetClientAuthentication()
 
 def http_proxyservice_security(entry, val):
 	return True
@@ -1295,6 +1298,113 @@ def jms_proxyservice_pipelinealerting_alertlevel(entry, val):
 	local_proxyservice_pipelinealerting_alertlevel(entry, val)
 
 def jms_proxyservice_policy(entry, val):
+	policyExpression, provider=createPolicyExpression(val)
+	setupPolicyExpression(entry, policyExpression, provider)
+	
+#===================================================================
+#	Customize:	BusinessService: Transport Type: JMS
+#===================================================================
+
+def jms_businessservice_description(entry, val):
+	entry.getCoreEntry().setDescription(val)
+	
+def jms_businessservice_retrycount(entry, val):
+	getCommonOutboundProperties(entry).setRetryCount(val)
+
+def jms_businessservice_retryapplicationerrors(entry, val):
+	getCommonOutboundProperties(entry).setRetryApplicationErrors(val)
+
+def jms_businessservice_retryinterval(entry, val):
+	getCommonOutboundProperties(entry).setRetryInterval(val)
+
+def jms_businessservice_endpointuri(entry, val):
+	changeEndpointUri(convertToTuple(val),entry)
+
+def jms_businessservice_dispatchpolicy(entry, val):
+	getJmsEndPointConfiguration(entry).setDispatchPolicy(val)
+
+def jms_businessservice_requestencoding(entry, val):
+	getJmsEndPointConfiguration(entry).setRequestEncoding(val)
+
+def jms_businessservice_jnditimeout(entry, val):
+	getJmsEndPointConfiguration(entry).setJndiTimeout(val)
+	
+def jms_businessservice_usessl(entry, val):
+	getJmsEndPointConfiguration(entry).setIsSecure(val)
+	
+def jms_businessservice_monitoring(entry, val):
+	return True # parent group
+
+def jms_businessservice_logging(entry, val):
+	return True # parent group
+
+def jms_businessservice_slaalerting(entry, val):
+	return True # parent group
+
+def jms_businessservice_pipelinealerting(entry, val):
+	return True # parent group
+
+def jms_businessservice_wspolicy(entry, val):
+	return True # parent group
+
+def jms_businessservice_executiontracing(entry, val):
+	return True  # parent group
+
+def jms_businessservice_messagetracing(entry, val):
+	return True  # parent group
+
+def jms_businessservice_executiontracing_isenabled(entry,val):
+	local_proxyservice_executiontracing_isenabled(entry,val)
+
+def jms_businessservice_messagetracing_isenabled(entry,val):
+	local_proxyservice_messagetracing_isenabled(entry,val)
+
+def jms_businessservice_messagetracing_defaultencoding(entry,val):
+	local_proxyservice_messagetracing_defaultencoding(entry,val)
+
+def jms_businessservice_messagetracing_maxsize(entry,val):
+	local_proxyservice_messagetracing_maxsize(entry,val)
+
+def jms_businessservice_messagetracing_detaillevel(entry,val):
+	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def jms_businessservice_wspolicy_bindingmode(entry, val):
+	local_proxyservice_wspolicy_bindingmode(entry, val)
+
+def jms_businessservice_wspolicy_policies(entry, values):
+	local_proxyservice_wspolicy_policies(entry, values)
+
+def jms_businessservice_monitoring_isenabled(entry, val):
+	local_proxyservice_monitoring_isenabled(entry, val)
+
+def jms_businessservice_monitoring_aggregationinterval(entry, val):
+	local_proxyservice_monitoring_aggregationinterval(entry, val)
+
+def jms_businessservice_monitoring_pipelinemonitoringlevel(entry, val):
+	local_proxyservice_monitoring_pipelinemonitoringlevel(entry, val)
+
+def jms_businessservice_reporting(entry, val):
+	local_proxyservice_reporting(entry, val)
+
+def jms_businessservice_logging_isenabled(entry, val):
+	local_proxyservice_logging_isenabled(entry, val)
+
+def jms_businessservice_logging_loglevel(entry, val):
+	local_proxyservice_logging_loglevel(entry, val)
+
+def jms_businessservice_slaalerting_isenabled(entry, val):
+	local_proxyservice_slaalerting_isenabled(entry, val)
+
+def jms_businessservice_slaalerting_alertlevel(entry, val):
+	local_proxyservice_slaalerting_alertlevel(entry, val)
+
+def jms_businessservice_pipelinealerting_isenabled(entry, val):
+	local_proxyservice_pipelinealerting_isenabled(entry, val)
+
+def jms_businessservice_pipelinealerting_alertlevel(entry, val):
+	local_proxyservice_pipelinealerting_alertlevel(entry, val)
+
+def jms_businessservice_policy(entry, val):
 	policyExpression, provider=createPolicyExpression(val)
 	setupPolicyExpression(entry, policyExpression, provider)
 
