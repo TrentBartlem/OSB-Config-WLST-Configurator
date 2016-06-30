@@ -7,6 +7,7 @@
 #	Copyright (c):					Tomas (Tome) Frastia | TomeCode.com
 #
 #	Changelog:
+#	1.1.30	more bugfixes for missing elements
 #	1.1.25	Fixed basic_auth->no_auth customization
 #	1.1.24	Added support for http compression flags
 #	1.1.23	Fail if a server is specified but unable to connect
@@ -438,18 +439,19 @@ def getThrottling(serviceDefinition):
 		return serviceDefinition.getCoreEntry().addNewThrottling()
 	return throttling
 
+def getWsPolicy(serviceDefinition):
+	wspolicy = serviceDefinition.getCoreEntry().getWsPolicy()
+	if wspolicy==None:
+		return serviceDefinition.getCoreEntry().addNewWsPolicy()
+	return wspolicy
+
 def getWsPolicyPolicies(serviceDefinition):
-	policies = serviceDefinition.getCoreEntry().getWsPolicy().getPolicies()
-	if policies==None:
-		return serviceDefinition.getCoreEntry().getWsPolicy().addNewPolicies()
-	return policies
+	policy = getWsPolicy(serviceDefinition)
+	return policy.getPolicies() or policy.addNewPolicies()
 
 def getWsPolicyPoliciesServicePolicy(serviceDefinition):
 	policies = getWsPolicyPolicies(serviceDefinition)
-	policy = policies.getServicePolicy()
-	if policy==None:
-		return policies.addNewServicePolicy()
-	return policy
+	return policies.getServicePolicy() or policies.addNewServicePolicy()
 
 def getHttpInboundProperties(serviceDefinition):
 	httpEndPointConfiguration = getHttpEndPointConfiguration(serviceDefinition)
@@ -875,9 +877,12 @@ def local_proxyservice_messagetracing_detaillevel(entry,val):
 	else:
 		entry.getCoreEntry().getMessageTracing().setDetailsLevel(en_val)
 
+def local_proxyservice_wspolicy_none(entry, val):
+	if (entry.getCoreEntry().getWsPolicy() != None):
+		entry.getCoreEntry().unsetWsPolicy()
 
 def local_proxyservice_wspolicy_bindingmode(entry, val):
-	entry.getCoreEntry().getWsPolicy().setBindingMode(PolicyBindingModeType.Enum.forString(val))
+	getWsPolicy(entry).setBindingMode(PolicyBindingModeType.Enum.forString(val))
 
 def local_proxyservice_wspolicy_policies(entry, values):
 	servicePolicy = getWsPolicyPoliciesServicePolicy(entry)
@@ -974,6 +979,9 @@ def http_proxyservice_messagetracing_maxsize(entry,val):
 
 def http_proxyservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def http_proxyservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
 
 def http_proxyservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
@@ -1261,6 +1269,9 @@ def jms_proxyservice_messagetracing_maxsize(entry,val):
 def jms_proxyservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
 
+def jms_proxyservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
+
 def jms_proxyservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
 
@@ -1368,6 +1379,9 @@ def jms_businessservice_messagetracing_maxsize(entry,val):
 def jms_businessservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
 
+def jms_businessservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
+
 def jms_businessservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
 
@@ -1461,6 +1475,9 @@ def http_businessservice_messagetracing_maxsize(entry,val):
 
 def http_businessservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def  http_businessservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
 
 def  http_businessservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
@@ -2077,6 +2094,9 @@ def sb_proxyservice_messagetracing_maxsize(entry,val):
 def sb_proxyservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
 
+def sb_proxyservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
+
 def sb_proxyservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
 
@@ -2155,6 +2175,9 @@ def sb_businessservice_messagetracing_maxsize(entry,val):
 
 def sb_businessservice_messagetracing_detaillevel(entry,val):
 	local_proxyservice_messagetracing_detaillevel(entry,val)
+
+def sb_businessservice_wspolicy_none(entry, val):
+	local_proxyservice_wspolicy_none(entry, val)
 
 def sb_businessservice_wspolicy_bindingmode(entry, val):
 	local_proxyservice_wspolicy_bindingmode(entry, val)
